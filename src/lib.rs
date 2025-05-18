@@ -1,3 +1,4 @@
+use std::ptr::addr_of_mut;
 use crate::include::stddef::*;
 use crate::include::stdint::*;
 use ::libc;
@@ -1119,7 +1120,7 @@ pub unsafe extern "C" fn dav1d_open(
 ) -> libc::c_int {
     let mut current_block: u64;
     static mut initted: pthread_once_t = 0 as libc::c_int;
-    pthread_once(&mut initted, Some(init_internal as unsafe extern "C" fn() -> ()));
+    pthread_once(addr_of_mut!(initted), Some(init_internal as unsafe extern "C" fn() -> ()));
     if c_out.is_null() {
         fprintf(
             stderr,
