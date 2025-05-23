@@ -82,6 +82,9 @@ use crate::include::time::__syscall_slong_t;
 use crate::include::time::clockid_t;
 use crate::include::time::time_t;
 use crate::include::time::timespec;
+use std::ffi::CStr;
+use std::fs::File;
+use std::io::Write;
 
 use crate::include::dav1d::common::Dav1dUserData;
 use crate::include::dav1d::common::Dav1dDataProps;
@@ -178,7 +181,7 @@ unsafe extern "C" fn synchronize(
     nspf: uint64_t,
     tfirst: uint64_t,
     elapsed: *mut uint64_t,
-    frametimes: *mut libc::FILE,
+    mut frametimes: Option<&mut File>,
 ) {
     let tcurr: uint64_t = get_time_nanos();
     let last: uint64_t = *elapsed;
@@ -195,10 +198,10 @@ unsafe extern "C" fn synchronize(
             *elapsed = deadline;
         }
     }
-    if !frametimes.is_null() {
+    if let Some(file) = frametimes.as_mut() {
         let frametime: uint64_t = (*elapsed).wrapping_sub(last);
-        fprintf(frametimes, b"%lu\n\0" as *const u8 as *const libc::c_char, frametime);
-        fflush(frametimes);
+        let _ = writeln!(*file, "{}", frametime);
+        let _ = (*file).flush();
     }
 }
 unsafe extern "C" fn print_stats(
@@ -447,16 +450,15 @@ unsafe fn main_0(argc: libc::c_int, argv: *const *mut libc::c_char) -> libc::c_i
     let mut tfirst: uint64_t = 0;
     let mut elapsed: uint64_t = 0;
     let mut i_fps: libc::c_double = 0.;
-    let mut frametimes: *mut libc::FILE = 0 as *mut libc::FILE;
+    let mut frametimes: Option<File> = None;
     let mut version: *const libc::c_char = dav1d_version();
     if strcmp(version, b"1.0.0-130-g26eca15\0" as *const u8 as *const libc::c_char) != 0
     {
-        fprintf(
-            stderr,
-            b"Version mismatch (library: %s, executable: %s)\n\0" as *const u8
-                as *const libc::c_char,
-            version,
-            b"1.0.0-130-g26eca15\0" as *const u8 as *const libc::c_char,
+        let ver_str = CStr::from_ptr(version).to_string_lossy();
+        eprintln!(
+            "Version mismatch (library: {}, executable: {})",
+            ver_str,
+            "1.0.0-130-g26eca15"
         );
         return 1 as libc::c_int;
     }
@@ -502,11 +504,8 @@ unsafe fn main_0(argc: libc::c_int, argv: *const *mut libc::c_char) -> libc::c_i
         i = i.wrapping_add(1);
     }
     if cli_settings.quiet == 0 {
-        fprintf(
-            stderr,
-            b"dav1d %s - by VideoLAN\n\0" as *const u8 as *const libc::c_char,
-            dav1d_version(),
-        );
+        let ver = CStr::from_ptr(dav1d_version()).to_string_lossy();
+        eprintln!("dav1d {} - by VideoLAN", ver);
     }
     if cli_settings.skip != 0 {
         let mut seq: Dav1dSequenceHeader = Dav1dSequenceHeader {
@@ -586,11 +585,9 @@ unsafe fn main_0(argc: libc::c_int, argv: *const *mut libc::c_char) -> libc::c_i
             seq_skip = seq_skip.wrapping_add(1);
         }
         if seq_skip != 0 && cli_settings.quiet == 0 {
-            fprintf(
-                stderr,
-                b"skipped %u packets due to missing sequence header\n\0" as *const u8
-                    as *const libc::c_char,
-                seq_skip,
+            eprintln!(
+                "skipped {} packets due to missing sequence header",
+                seq_skip
             );
         }
     }
@@ -604,10 +601,10 @@ unsafe fn main_0(argc: libc::c_int, argv: *const *mut libc::c_char) -> libc::c_i
         return 1 as libc::c_int;
     }
     if !(cli_settings.frametimes).is_null() {
-        frametimes = fopen(
-            cli_settings.frametimes,
-            b"w\0" as *const u8 as *const libc::c_char,
-        );
+        let path_c = CStr::from_ptr(cli_settings.frametimes);
+        if let Ok(path) = path_c.to_str() {
+            frametimes = File::create(path).ok();
+        }
     }
     if cli_settings.realtime as libc::c_uint
         != REALTIME_CUSTOM as libc::c_int as libc::c_uint
@@ -638,11 +635,8 @@ unsafe fn main_0(argc: libc::c_int, argv: *const *mut libc::c_char) -> libc::c_i
         if res < 0 as libc::c_int {
             if res != -(11 as libc::c_int) {
                 dav1d_data_unref(&mut data);
-                fprintf(
-                    stderr,
-                    b"Error decoding frame: %s\n\0" as *const u8 as *const libc::c_char,
-                    strerror(-res),
-                );
+                let err_str = CStr::from_ptr(strerror(-res)).to_string_lossy();
+                eprintln!("Error decoding frame: {}", err_str);
                 if res != -(22 as libc::c_int) {
                     break;
                 }
@@ -651,11 +645,8 @@ unsafe fn main_0(argc: libc::c_int, argv: *const *mut libc::c_char) -> libc::c_i
         res = dav1d_get_picture(c, &mut p);
         if res < 0 as libc::c_int {
             if res != -(11 as libc::c_int) {
-                fprintf(
-                    stderr,
-                    b"Error decoding frame: %s\n\0" as *const u8 as *const libc::c_char,
-                    strerror(-res),
-                );
+                let err_str = CStr::from_ptr(strerror(-res)).to_string_lossy();
+                eprintln!("Error decoding frame: {}", err_str);
                 if res != -(22 as libc::c_int) {
                     break;
                 }
@@ -671,8 +662,8 @@ unsafe fn main_0(argc: libc::c_int, argv: *const *mut libc::c_char) -> libc::c_i
                     fps.as_mut_ptr() as *const libc::c_uint,
                 );
                 if res < 0 as libc::c_int {
-                    if !frametimes.is_null() {
-                        fclose(frametimes);
+                    if let Some(file) = frametimes.take() {
+                        drop(file);
                     }
                     return 1 as libc::c_int;
                 }
@@ -690,7 +681,7 @@ unsafe fn main_0(argc: libc::c_int, argv: *const *mut libc::c_char) -> libc::c_i
                     nspf,
                     tfirst,
                     &mut elapsed,
-                    frametimes,
+                    frametimes.as_mut(),
                 );
             }
             if cli_settings.quiet == 0 {
@@ -714,12 +705,8 @@ unsafe fn main_0(argc: libc::c_int, argv: *const *mut libc::c_char) -> libc::c_i
             res = dav1d_get_picture(c, &mut p);
             if res < 0 as libc::c_int {
                 if res != -(11 as libc::c_int) {
-                    fprintf(
-                        stderr,
-                        b"Error decoding frame: %s\n\0" as *const u8
-                            as *const libc::c_char,
-                        strerror(-res),
-                    );
+                    let err_str = CStr::from_ptr(strerror(-res)).to_string_lossy();
+                    eprintln!("Error decoding frame: {}", err_str);
                     if res != -(22 as libc::c_int) {
                         break;
                     }
@@ -737,8 +724,8 @@ unsafe fn main_0(argc: libc::c_int, argv: *const *mut libc::c_char) -> libc::c_i
                         fps.as_mut_ptr() as *const libc::c_uint,
                     );
                     if res < 0 as libc::c_int {
-                        if !frametimes.is_null() {
-                            fclose(frametimes);
+                        if let Some(file) = frametimes.take() {
+                            drop(file);
                         }
                         return 1 as libc::c_int;
                     }
@@ -756,7 +743,7 @@ unsafe fn main_0(argc: libc::c_int, argv: *const *mut libc::c_char) -> libc::c_i
                         nspf,
                         tfirst,
                         &mut elapsed,
-                        frametimes,
+                        frametimes.as_mut(),
                     );
                 }
                 if cli_settings.quiet == 0 {
@@ -765,13 +752,13 @@ unsafe fn main_0(argc: libc::c_int, argv: *const *mut libc::c_char) -> libc::c_i
             }
         }
     }
-    if !frametimes.is_null() {
-        fclose(frametimes);
+    if let Some(file) = frametimes {
+        drop(file);
     }
     input_close(in_0);
     if !out.is_null() {
         if cli_settings.quiet == 0 && istty != 0 {
-            fprintf(stderr, b"\n\0" as *const u8 as *const libc::c_char);
+            eprintln!("");
         }
         if !(cli_settings.verify).is_null() {
             res |= output_verify(out, cli_settings.verify);
@@ -779,7 +766,7 @@ unsafe fn main_0(argc: libc::c_int, argv: *const *mut libc::c_char) -> libc::c_i
             output_close(out);
         }
     } else {
-        fprintf(stderr, b"No data decoded\n\0" as *const u8 as *const libc::c_char);
+        eprintln!("No data decoded");
         res = 1 as libc::c_int;
     }
     dav1d_close(&mut c);
