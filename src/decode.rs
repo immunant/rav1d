@@ -15609,83 +15609,35 @@ unsafe extern "C" fn setup_tile(
         unit_idx = (((*ts).tiling.row_start & 16 as libc::c_int) >> 3 as libc::c_int)
             + (((*ts).tiling.col_start & 16 as libc::c_int) >> 4 as libc::c_int);
     }
-    let mut current_block_31: u64;
-    let mut p_0: libc::c_int = 0 as libc::c_int;
-    while p_0 < 3 as libc::c_int {
-        if !(((*f).lf.restore_planes >> p_0) as libc::c_uint & 1 as libc::c_uint == 0) {
-            if (*(*f).frame_hdr).width[0 as libc::c_int as usize]
-                != (*(*f).frame_hdr).width[1 as libc::c_int as usize]
-            {
-                let ss_hor: libc::c_int = (p_0 != 0
-                    && (*f).cur.p.layout as libc::c_uint
-                        != DAV1D_PIXEL_LAYOUT_I444 as libc::c_int as libc::c_uint)
-                    as libc::c_int;
-                let d: libc::c_int = (*(*f).frame_hdr).super_res.width_scale_denominator;
-                let unit_size_log2: libc::c_int = (*(*f).frame_hdr)
-                    .restoration
-                    .unit_size[(p_0 != 0) as libc::c_int as usize];
-                let rnd: libc::c_int = ((8 as libc::c_int) << unit_size_log2)
-                    - 1 as libc::c_int;
-                let shift: libc::c_int = unit_size_log2 + 3 as libc::c_int;
-                let x: libc::c_int = (4 as libc::c_int * (*ts).tiling.col_start * d
-                    >> ss_hor) + rnd >> shift;
-                let px_x: libc::c_int = x << unit_size_log2 + ss_hor;
-                let u_idx: libc::c_int = unit_idx
-                    + ((px_x & 64 as libc::c_int) >> 6 as libc::c_int);
-                let sb128x: libc::c_int = px_x >> 7 as libc::c_int;
+    let mut p_0: libc::c_int = 0;
+    while p_0 < 3 {
+        if (((*f).lf.restore_planes >> p_0) & 1) != 0 {
+            if (*(*f).frame_hdr).width[0 as usize] != (*(*f).frame_hdr).width[1 as usize] {
+                let ss_hor = (p_0 != 0 && (*f).cur.p.layout as libc::c_uint != DAV1D_PIXEL_LAYOUT_I444 as libc::c_uint) as libc::c_int;
+                let d = (*(*f).frame_hdr).super_res.width_scale_denominator;
+                let unit_size_log2 = (*(*f).frame_hdr).restoration.unit_size[(p_0 != 0) as usize];
+                let rnd = ((8 as libc::c_int) << unit_size_log2) - 1;
+                let shift = unit_size_log2 + 3;
+                let x = (4 * (*ts).tiling.col_start * d >> ss_hor) + rnd >> shift;
+                let px_x = x << unit_size_log2 + ss_hor;
+                let u_idx = unit_idx + ((px_x & 64) >> 6);
+                let sb128x = px_x >> 7;
                 if sb128x >= (*f).sr_sb128w {
-                    current_block_31 = 2370887241019905314;
-                } else {
-                    (*ts)
-                        .lr_ref[p_0
-                        as usize] = &mut *(*((*((*f).lf.lr_mask)
-                        .offset((sb_idx + sb128x) as isize))
-                        .lr)
-                        .as_mut_ptr()
-                        .offset(p_0 as isize))
-                        .as_mut_ptr()
-                        .offset(u_idx as isize) as *mut Av1RestorationUnit;
-                    current_block_31 = 1608152415753874203;
+                    p_0 += 1;
+                    continue;
                 }
+                (*ts).lr_ref[p_0 as usize] = &mut *(*((*((*f).lf.lr_mask).offset((sb_idx + sb128x) as isize)).lr).as_mut_ptr().offset(p_0 as isize)).as_mut_ptr().offset(u_idx as isize) as *mut Av1RestorationUnit;
             } else {
-                (*ts)
-                    .lr_ref[p_0
-                    as usize] = &mut *(*((*((*f).lf.lr_mask).offset(sb_idx as isize)).lr)
-                    .as_mut_ptr()
-                    .offset(p_0 as isize))
-                    .as_mut_ptr()
-                    .offset(unit_idx as isize) as *mut Av1RestorationUnit;
-                current_block_31 = 1608152415753874203;
+                (*ts).lr_ref[p_0 as usize] = &mut *(*((*((*f).lf.lr_mask).offset(sb_idx as isize)).lr).as_mut_ptr().offset(p_0 as isize)).as_mut_ptr().offset(unit_idx as isize) as *mut Av1RestorationUnit;
             }
-            match current_block_31 {
-                2370887241019905314 => {}
-                _ => {
-                    (*(*ts).lr_ref[p_0 as usize])
-                        .filter_v[0 as libc::c_int
-                        as usize] = 3 as libc::c_int as int8_t;
-                    (*(*ts).lr_ref[p_0 as usize])
-                        .filter_v[1 as libc::c_int
-                        as usize] = -(7 as libc::c_int) as int8_t;
-                    (*(*ts).lr_ref[p_0 as usize])
-                        .filter_v[2 as libc::c_int
-                        as usize] = 15 as libc::c_int as int8_t;
-                    (*(*ts).lr_ref[p_0 as usize])
-                        .filter_h[0 as libc::c_int
-                        as usize] = 3 as libc::c_int as int8_t;
-                    (*(*ts).lr_ref[p_0 as usize])
-                        .filter_h[1 as libc::c_int
-                        as usize] = -(7 as libc::c_int) as int8_t;
-                    (*(*ts).lr_ref[p_0 as usize])
-                        .filter_h[2 as libc::c_int
-                        as usize] = 15 as libc::c_int as int8_t;
-                    (*(*ts).lr_ref[p_0 as usize])
-                        .sgr_weights[0 as libc::c_int
-                        as usize] = -(32 as libc::c_int) as int8_t;
-                    (*(*ts).lr_ref[p_0 as usize])
-                        .sgr_weights[1 as libc::c_int
-                        as usize] = 31 as libc::c_int as int8_t;
-                }
-            }
+            (*(*ts).lr_ref[p_0 as usize]).filter_v[0] = 3 as int8_t;
+            (*(*ts).lr_ref[p_0 as usize]).filter_v[1] = -(7 as libc::c_int) as int8_t;
+            (*(*ts).lr_ref[p_0 as usize]).filter_v[2] = 15 as int8_t;
+            (*(*ts).lr_ref[p_0 as usize]).filter_h[0] = 3 as int8_t;
+            (*(*ts).lr_ref[p_0 as usize]).filter_h[1] = -(7 as libc::c_int) as int8_t;
+            (*(*ts).lr_ref[p_0 as usize]).filter_h[2] = 15 as int8_t;
+            (*(*ts).lr_ref[p_0 as usize]).sgr_weights[0] = -(32 as libc::c_int) as int8_t;
+            (*(*ts).lr_ref[p_0 as usize]).sgr_weights[1] = 31 as int8_t;
         }
         p_0 += 1;
     }
@@ -17465,90 +17417,45 @@ pub unsafe extern "C" fn dav1d_decode_frame_init_cdf(
 pub unsafe extern "C" fn dav1d_decode_frame_main(
     f: *mut Dav1dFrameContext,
 ) -> libc::c_int {
-    let mut current_block: u64;
     let c: *const Dav1dContext = (*f).c;
-    let mut retval: libc::c_int = -(22 as libc::c_int);
-    if !((*(*f).c).n_tc == 1 as libc::c_int as libc::c_uint) {
-        unreachable!();
-    }
+    if (*(*f).c).n_tc != 1 { unreachable!(); }
     let t: *mut Dav1dTaskContext = &mut *((*c).tc)
         .offset(f.offset_from((*c).fc) as isize)
         as *mut Dav1dTaskContext;
     (*t).f = f;
-    (*t).frame_thread.pass = 0 as libc::c_int;
-    let mut n: libc::c_int = 0 as libc::c_int;
-    while n < (*f).sb128w * (*(*f).frame_hdr).tiling.rows {
+    (*t).frame_thread.pass = 0;
+    for n in 0..((*f).sb128w * (*(*f).frame_hdr).tiling.rows) {
         reset_context(
             &mut *((*f).a).offset(n as isize),
-            ((*(*f).frame_hdr).frame_type as libc::c_uint
-                & 1 as libc::c_int as libc::c_uint == 0) as libc::c_int,
-            0 as libc::c_int,
+            ((*(*f).frame_hdr).frame_type as libc::c_uint & 1 == 0) as libc::c_int,
+            0,
         );
-        n += 1;
     }
-    let mut tile_row: libc::c_int = 0 as libc::c_int;
-    's_44: loop {
-        if !(tile_row < (*(*f).frame_hdr).tiling.rows) {
-            current_block = 10652014663920648156;
-            break;
-        }
-        let sbh_end: libc::c_int = imin(
-            (*(*f).frame_hdr).tiling.row_start_sb[(tile_row + 1 as libc::c_int) as usize]
-                as libc::c_int,
+    for tile_row in 0..(*(*f).frame_hdr).tiling.rows {
+        let sbh_end = imin(
+            (*(*f).frame_hdr).tiling.row_start_sb[(tile_row + 1) as usize] as libc::c_int,
             (*f).sbh,
         );
-        let mut sby: libc::c_int = (*(*f).frame_hdr)
-            .tiling
-            .row_start_sb[tile_row as usize] as libc::c_int;
+        let mut sby = (*(*f).frame_hdr).tiling.row_start_sb[tile_row as usize] as libc::c_int;
         while sby < sbh_end {
-            (*t).by = sby << 4 as libc::c_int + (*(*f).seq_hdr).sb128;
-            let by_end: libc::c_int = (*t).by + (*f).sb_step >> 1 as libc::c_int;
+            (*t).by = sby << (4 + (*(*f).seq_hdr).sb128);
+            let by_end = ((*t).by + (*f).sb_step) >> 1;
             if (*(*f).frame_hdr).use_ref_frame_mvs != 0 {
-                dav1d_refmvs_load_tmvs(
-                    &mut (*f).rf,
-                    tile_row,
-                    0 as libc::c_int,
-                    (*f).bw >> 1 as libc::c_int,
-                    (*t).by >> 1 as libc::c_int,
-                    by_end,
-                );
+                dav1d_refmvs_load_tmvs(&mut (*f).rf, tile_row, 0, (*f).bw >> 1, (*t).by >> 1, by_end);
             }
-            let mut tile_col: libc::c_int = 0 as libc::c_int;
-            while tile_col < (*(*f).frame_hdr).tiling.cols {
-                (*t)
-                    .ts = &mut *((*f).ts)
-                    .offset(
-                        (tile_row * (*(*f).frame_hdr).tiling.cols + tile_col) as isize,
-                    ) as *mut Dav1dTileState;
-                if dav1d_decode_tile_sbrow(t) != 0 {
-                    current_block = 3839639024989683879;
-                    break 's_44;
-                }
-                tile_col += 1;
+            for tile_col in 0..(*(*f).frame_hdr).tiling.cols {
+                (*t).ts = &mut *((*f).ts).offset((tile_row * (*(*f).frame_hdr).tiling.cols + tile_col) as isize) as *mut Dav1dTileState;
+                let res = dav1d_decode_tile_sbrow(t);
+                if res != 0 { return res; }
             }
-            if (*(*f).frame_hdr).frame_type as libc::c_uint
-                & 1 as libc::c_int as libc::c_uint != 0
-            {
-                dav1d_refmvs_save_tmvs(
-                    &mut (*t).rt,
-                    0 as libc::c_int,
-                    (*f).bw >> 1 as libc::c_int,
-                    (*t).by >> 1 as libc::c_int,
-                    by_end,
-                );
+            if (*(*f).frame_hdr).frame_type as libc::c_uint & 1 != 0 {
+                dav1d_refmvs_save_tmvs(&mut (*t).rt, 0, (*f).bw >> 1, (*t).by >> 1, by_end);
             }
             ((*f).bd_fn.filter_sbrow).expect("non-null function pointer")(f, sby);
             sby += 1;
         }
-        tile_row += 1;
     }
-    match current_block {
-        10652014663920648156 => {
-            retval = 0 as libc::c_int;
-        }
-        _ => {}
-    }
-    return retval;
+    return 0 as libc::c_int;
 }
 #[no_mangle]
 pub unsafe extern "C" fn dav1d_decode_frame_exit(
